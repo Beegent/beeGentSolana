@@ -57,6 +57,16 @@ Notas operativas:
 - Las rutas `POST /agents/solana/actions/transfer/prepare` y `POST /agents/solana/actions/transfer/sign` requieren la cabecera `x-agent-actions-key` con el mismo valor configurado en `AGENT_ACTIONS_KEY`.
 - La e2e actual ya no levanta el `AppModule` completo, asi que no toca Postgres cuando ejecutas `npm run test:e2e`.
 
+## Health de base de datos
+
+Con la aplicacion levantada contra PostgreSQL, puedes verificar la conexion real con:
+
+```bash
+GET /health/db
+```
+
+La respuesta devuelve `status: ok` y metadatos basicos de la conexion activa cuando PostgreSQL responde correctamente.
+
 ## Compile and run the project
 
 ```bash
