@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SolanaPriceQueryDto } from './dto/solana-price-query.dto';
 import { SolanaTokenQueryDto } from './dto/solana-token-query.dto';
 import { SolanaTransferActionDto } from './dto/solana-transfer-action.dto';
 import { AgentsService } from './agents.service';
+import { AgentActionsGuard } from './guards/agent-actions.guard';
 
 @ApiTags('Agents')
 @Controller('agents')
@@ -65,6 +66,13 @@ export class AgentsController {
   }
 
   @Post('solana/actions/transfer/prepare')
+  @UseGuards(AgentActionsGuard)
+  @ApiHeader({
+    name: 'x-agent-actions-key',
+    description:
+      'Clave necesaria para habilitar acciones que usan la wallet del agente',
+    required: true,
+  })
   @ApiOperation({
     summary: 'Prepara una transferencia SOL usando la wallet del agente',
   })
@@ -76,6 +84,13 @@ export class AgentsController {
   }
 
   @Post('solana/actions/transfer/sign')
+  @UseGuards(AgentActionsGuard)
+  @ApiHeader({
+    name: 'x-agent-actions-key',
+    description:
+      'Clave necesaria para habilitar acciones que usan la wallet del agente',
+    required: true,
+  })
   @ApiOperation({
     summary: 'Firma una transferencia SOL usando la wallet del agente',
   })

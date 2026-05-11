@@ -31,6 +31,32 @@
 $ npm install
 ```
 
+## Variables de entorno
+
+El backend usa PostgreSQL y el modulo de Solana. La configuracion minima recomendada en desarrollo es esta:
+
+```env
+PORT=3000
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=beegent_solana
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+DB_SYNCHRONIZE=true
+DB_DROP_SCHEMA=false
+DB_LOGGING=true
+SOLANA_CLUSTER=devnet
+AGENT_ACTIONS_KEY=define-una-clave-larga
+SOLANA_WALLET_SECRET_KEY=[1,2,3]
+```
+
+Notas operativas:
+
+- `DB_DROP_SCHEMA` queda en `false` por defecto para evitar borrar el esquema al arrancar.
+- `DB_SYNCHRONIZE` puede seguir en `true` en desarrollo para mantener la base funcional sin migraciones manuales.
+- Las rutas `POST /agents/solana/actions/transfer/prepare` y `POST /agents/solana/actions/transfer/sign` requieren la cabecera `x-agent-actions-key` con el mismo valor configurado en `AGENT_ACTIONS_KEY`.
+- La e2e actual ya no levanta el `AppModule` completo, asi que no toca Postgres cuando ejecutas `npm run test:e2e`.
+
 ## Compile and run the project
 
 ```bash
