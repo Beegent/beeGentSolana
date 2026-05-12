@@ -67,6 +67,16 @@ GET /health/db
 
 La respuesta devuelve `status: ok` y metadatos basicos de la conexion activa cuando PostgreSQL responde correctamente.
 
+## Health global
+
+Tambien puedes consultar el estado agregado del backend con:
+
+```bash
+GET /health
+```
+
+Esta ruta combina el estado de PostgreSQL y del RPC de Solana. Si alguno falla, la API responde con `503 Service Unavailable` y un cuerpo con el detalle por dependencia.
+
 ## Compile and run the project
 
 ```bash

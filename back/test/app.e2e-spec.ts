@@ -9,12 +9,32 @@ describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
   let appService: {
     getHello: jest.Mock;
+    getSystemHealth: jest.Mock;
     getDatabaseHealth: jest.Mock;
   };
 
   beforeEach(async () => {
     appService = {
       getHello: jest.fn().mockReturnValue('Hello World!'),
+      getSystemHealth: jest.fn().mockResolvedValue({
+        status: 'ok',
+        services: {
+          database: {
+            status: 'ok',
+            details: {
+              driver: 'postgres',
+              host: 'localhost',
+            },
+          },
+          solana: {
+            status: 'ok',
+            details: {
+              cluster: 'devnet',
+              rpcEndpoint: 'https://api.devnet.solana.com',
+            },
+          },
+        },
+      }),
       getDatabaseHealth: jest.fn().mockResolvedValue({
         status: 'ok',
         driver: 'postgres',
@@ -47,6 +67,31 @@ describe('AppController (e2e)', () => {
       .get('/')
       .expect(200)
       .expect('Hello World!');
+  });
+
+  it('/health (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/health')
+      .expect(200)
+      .expect({
+        status: 'ok',
+        services: {
+          database: {
+            status: 'ok',
+            details: {
+              driver: 'postgres',
+              host: 'localhost',
+            },
+          },
+          solana: {
+            status: 'ok',
+            details: {
+              cluster: 'devnet',
+              rpcEndpoint: 'https://api.devnet.solana.com',
+            },
+          },
+        },
+      });
   });
 
   it('/health/db (GET)', () => {

@@ -10,6 +10,11 @@ export class AppController {
     return this.appService.getHello();
   }
 
+  @Get('health')
+  getSystemHealth() {
+    return this.appService.getSystemHealth();
+  }
+
   @Get('health/db')
   getDatabaseHealth() {
     return this.appService.getDatabaseHealth();

@@ -5,6 +5,17 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { AgentsService } from './agents/agents.service';
+
+type HealthDependencyStatus = {
+  status: 'ok';
+  details: unknown;
+};
+
+type UnhealthyDependencyStatus = {
+  status: 'error';
+  message: string;
+};
 
 @Injectable()
 export class AppService {
@@ -12,6 +23,8 @@ export class AppService {
     @Optional()
     @InjectDataSource()
     private readonly dataSource?: DataSource,
+    @Optional()
+    private readonly agentsService?: AgentsService,
   ) {}
 
   getHello(): string {
@@ -61,5 +74,80 @@ export class AppService {
       database,
       checkedAt: new Date().toISOString(),
     };
+  }
+
+  async getSystemHealth() {
+    const checkedAt = new Date().toISOString();
+    const [databaseResult, solanaResult] = await Promise.allSettled([
+      this.getDatabaseHealth(),
+      this.getSolanaRpcHealth(),
+    ]);
+
+    const services = {
+      database: this.mapHealthResult(databaseResult),
+      solana: this.mapHealthResult(solanaResult),
+    };
+
+    if (
+      services.database.status === 'error' ||
+      services.solana.status === 'error'
+    ) {
+      throw new ServiceUnavailableException({
+        status: 'degraded',
+        checkedAt,
+        services,
+      });
+    }
+
+    return {
+      status: 'ok',
+      checkedAt,
+      services,
+    };
+  }
+
+  private async getSolanaRpcHealth() {
+    if (!this.agentsService) {
+      throw new ServiceUnavailableException(
+        'El servicio de Solana no esta disponible en este contexto.',
+      );
+    }
+
+    const health = await this.agentsService.getSolanaConnectionStatus();
+
+    return {
+      status: health.health,
+      network: health.network,
+      cluster: health.cluster,
+      rpcEndpoint: health.rpcEndpoint,
+      latestBlockhash: health.latestBlockhash,
+      lastValidBlockHeight: health.lastValidBlockHeight,
+      slot: health.slot,
+      source: health.source,
+    };
+  }
+
+  private mapHealthResult<T>(
+    result: PromiseSettledResult<T>,
+  ): HealthDependencyStatus | UnhealthyDependencyStatus {
+    if (result.status === 'fulfilled') {
+      return {
+        status: 'ok',
+        details: result.value,
+      };
+    }
+
+    return {
+      status: 'error',
+      message: this.getErrorMessage(result.reason),
+    };
+  }
+
+  private getErrorMessage(error: unknown) {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return 'No fue posible obtener el estado de salud del servicio.';
   }
 }

@@ -6,5 +6,6 @@ import { AgentActionsGuard } from './guards/agent-actions.guard';
 @Module({
   controllers: [AgentsController],
   providers: [AgentsService, AgentActionsGuard],
+  exports: [AgentsService],
 })
 export class AgentsModule {}

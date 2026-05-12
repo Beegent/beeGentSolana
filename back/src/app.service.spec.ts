@@ -49,4 +49,62 @@ describe('AppService', () => {
       ServiceUnavailableException,
     );
   });
+
+  it('reporta el health global cuando PostgreSQL y Solana estan operativos', async () => {
+    const service = new AppService(
+      {
+        isInitialized: true,
+        query: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+        options: {
+          type: 'postgres',
+          host: 'localhost',
+          port: 5432,
+          database: 'beegent_solana',
+        },
+      } as unknown as DataSource,
+      {
+        getSolanaConnectionStatus: jest.fn().mockResolvedValue({
+          health: 'ok',
+          network: 'solana',
+          cluster: 'devnet',
+          rpcEndpoint: 'https://api.devnet.solana.com',
+          latestBlockhash: '9xQeWvG816bUx9EPjHmaT23yvVMXQLYJbP9P7p9B5M5S',
+          lastValidBlockHeight: 278000123,
+          slot: 311000001,
+          source: 'solana-rpc',
+        }),
+      } as never,
+    );
+
+    await expect(service.getSystemHealth()).resolves.toEqual(
+      expect.objectContaining({
+        status: 'ok',
+        services: expect.objectContaining({
+          database: expect.objectContaining({ status: 'ok' }),
+          solana: expect.objectContaining({ status: 'ok' }),
+        }),
+      }),
+    );
+  });
+
+  it('degrada el health global cuando Solana RPC no responde', async () => {
+    const service = new AppService(
+      {
+        isInitialized: true,
+        query: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+        options: {
+          type: 'postgres',
+        },
+      } as unknown as DataSource,
+      {
+        getSolanaConnectionStatus: jest
+          .fn()
+          .mockRejectedValue(new Error('rpc unavailable')),
+      } as never,
+    );
+
+    await expect(service.getSystemHealth()).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+  });
 });
