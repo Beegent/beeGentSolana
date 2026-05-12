@@ -26,8 +26,8 @@ const signalCards = [
 
 const operationalPoints = [
   "Bootstrap automático de perfil, red, tokens y wallet al abrir la pantalla.",
-  "Consultas manuales de precio, on-chain y metadata real del mint.",
-  "Proxy interno en Next para hablar con Nest sin exponer CORS en esta fase.",
+  "Consultas manuales de health, precio, on-chain y metadata real del mint.",
+  "Proxy interno en Next para hablar con Nest y reenviar la clave protegida en desarrollo.",
   "Bitácora visual de peticiones para revisar el comportamiento inicial del sistema.",
 ];
 

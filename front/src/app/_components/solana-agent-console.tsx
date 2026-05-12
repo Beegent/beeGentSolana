@@ -35,6 +35,30 @@ type StatusResponse = {
   slot: number;
 };
 
+type HealthDependency = {
+  details?: GenericResponse;
+  message?: string;
+  status: "ok" | "error";
+};
+
+type SystemHealthResponse = {
+  checkedAt: string;
+  services: {
+    database: HealthDependency;
+    solana: HealthDependency;
+  };
+  status: string;
+};
+
+type DatabaseHealthResponse = {
+  checkedAt: string;
+  database: string | null;
+  driver: string;
+  host: string | null;
+  port: number | null;
+  status: string;
+};
+
 type WalletResponse = {
   wallet: {
     balanceSol?: number;
@@ -65,6 +89,16 @@ function normalizeError(payload: unknown, fallback: string) {
     return payload.message.join(". ");
   }
 
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "message" in payload &&
+    payload.message &&
+    typeof payload.message === "object"
+  ) {
+    return JSON.stringify(payload.message);
+  }
+
   return fallback;
 }
 
@@ -72,12 +106,18 @@ export function SolanaAgentConsole() {
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [tokens, setTokens] = useState<TokensResponse["tokens"]>([]);
   const [status, setStatus] = useState<StatusResponse | null>(null);
+  const [systemHealth, setSystemHealth] = useState<SystemHealthResponse | null>(
+    null,
+  );
+  const [databaseHealth, setDatabaseHealth] =
+    useState<DatabaseHealthResponse | null>(null);
   const [wallet, setWallet] = useState<WalletResponse | null>(null);
   const [priceToken, setPriceToken] = useState("SOL");
   const [assetToken, setAssetToken] = useState("USDC");
   const [vsCurrency, setVsCurrency] = useState("usd");
   const [recipient, setRecipient] = useState("");
   const [amountSol, setAmountSol] = useState("0.05");
+  const [actionKey, setActionKey] = useState("");
   const [pricePayload, setPricePayload] = useState<GenericResponse | null>(
     null,
   );
@@ -120,18 +160,19 @@ export function SolanaAgentConsole() {
     label: string,
     options?: {
       body?: Record<string, string>;
+      headers?: Record<string, string>;
       method?: "GET" | "POST";
     },
   ) {
     const method = options?.method ?? "GET";
+    const requestHeaders = {
+      ...(options?.headers ?? {}),
+      ...(method === "POST" ? { "content-type": "application/json" } : {}),
+    };
     const response = await fetch(`/api/solana?resource=${resourceQuery}`, {
       method,
       headers:
-        method === "POST"
-          ? {
-              "content-type": "application/json",
-            }
-          : undefined,
+        Object.keys(requestHeaders).length > 0 ? requestHeaders : undefined,
       body: method === "POST" ? JSON.stringify(options?.body ?? {}) : undefined,
       cache: "no-store",
     });
@@ -226,6 +267,35 @@ export function SolanaAgentConsole() {
     }
   }
 
+  async function handleBackendHealth(target: "health" | "databaseHealth") {
+    setSurfaceError(null);
+
+    try {
+      if (target === "health") {
+        const payload = await callAgentApi<SystemHealthResponse>(
+          "health",
+          "Health global",
+        );
+
+        setSystemHealth(payload);
+        return;
+      }
+
+      const payload = await callAgentApi<DatabaseHealthResponse>(
+        "databaseHealth",
+        "Health PostgreSQL",
+      );
+
+      setDatabaseHealth(payload);
+    } catch (error) {
+      setSurfaceError(
+        error instanceof Error
+          ? error.message
+          : "No fue posible consultar el health del backend.",
+      );
+    }
+  }
+
   async function handleTransferAction(
     action: "prepareTransfer" | "signTransfer",
   ) {
@@ -242,6 +312,11 @@ export function SolanaAgentConsole() {
             amountSol,
             recipient,
           },
+          headers: actionKey.trim()
+            ? {
+                "x-agent-actions-key": actionKey.trim(),
+              }
+            : undefined,
           method: "POST",
         },
       );
@@ -331,6 +406,26 @@ export function SolanaAgentConsole() {
               : "Configura SOLANA_WALLET_SECRET_KEY para activar firma"}
           </p>
         </article>
+        <article className="status-card">
+          <span className="meta-label">Backend</span>
+          <strong className="meta-value">{systemHealth?.status ?? "--"}</strong>
+          <p className="meta-value-subtle">
+            {systemHealth?.checkedAt
+              ? `Health global ${formatTimestamp(systemHealth.checkedAt)}`
+              : "Consulta manual pendiente"}
+          </p>
+        </article>
+        <article className="status-card">
+          <span className="meta-label">PostgreSQL</span>
+          <strong className="meta-value">
+            {databaseHealth?.status ?? "--"}
+          </strong>
+          <p className="meta-value-subtle">
+            {databaseHealth?.database
+              ? databaseHealth.database
+              : "Consulta manual pendiente"}
+          </p>
+        </article>
       </div>
 
       <div className="console-grid">
@@ -354,6 +449,46 @@ export function SolanaAgentConsole() {
             ) : (
               <p className="empty-state">Todavia no hay tokens cargados.</p>
             )}
+          </article>
+
+          <article className="console-card">
+            <div className="panel-title-row">
+              <h3 className="panel-title">Diagnostico del backend</h3>
+              <span className="inline-note">
+                Prueba directa de /health y /health/db
+              </span>
+            </div>
+            <p className="field-note">
+              Estas acciones pasan por el proxy interno de Next y golpean las
+              rutas raiz del back para validar conexión real con PostgreSQL y
+              Solana.
+            </p>
+            <div className="form-actions">
+              <button
+                className="ghost-button"
+                disabled={isPending}
+                onClick={() => {
+                  startTransition(() => {
+                    void handleBackendHealth("health");
+                  });
+                }}
+                type="button"
+              >
+                Health global
+              </button>
+              <button
+                className="form-button"
+                disabled={isPending}
+                onClick={() => {
+                  startTransition(() => {
+                    void handleBackendHealth("databaseHealth");
+                  });
+                }}
+                type="button"
+              >
+                Health PostgreSQL
+              </button>
+            </div>
           </article>
 
           <article className="console-card">
@@ -464,6 +599,19 @@ export function SolanaAgentConsole() {
                   value={amountSol}
                 />
               </div>
+              <div className="form-field">
+                <label htmlFor="action-key">x-agent-actions-key</label>
+                <input
+                  id="action-key"
+                  onChange={(event) => setActionKey(event.target.value)}
+                  placeholder="Clave del back para prepare/sign"
+                  value={actionKey}
+                />
+              </div>
+              <p className="field-note">
+                Si prefieres no escribir la clave en la UI, también puedes
+                definir BACKEND_AGENT_ACTIONS_KEY en el servidor de Next.
+              </p>
               <div className="form-actions">
                 <button
                   className="ghost-button"
@@ -506,6 +654,14 @@ export function SolanaAgentConsole() {
               <p className="empty-state">{surfaceError}</p>
             ) : null}
             <div className="preview-grid">
+              <div className="code-window">
+                <span className="code-label">Health global</span>
+                <pre>{formatPayload(systemHealth)}</pre>
+              </div>
+              <div className="code-window">
+                <span className="code-label">Health PostgreSQL</span>
+                <pre>{formatPayload(databaseHealth)}</pre>
+              </div>
               <div className="code-window">
                 <span className="code-label">Precio</span>
                 <pre>{formatPayload(pricePayload)}</pre>
@@ -567,4 +723,8 @@ function formatPayload(payload: unknown) {
   }
 
   return JSON.stringify(payload, null, 2);
+}
+
+function formatTimestamp(value: string) {
+  return new Date(value).toLocaleTimeString("es-ES");
 }
